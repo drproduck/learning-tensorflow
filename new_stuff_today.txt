@@ -1,0 +1,107 @@
+6/30/2017
+***__doc__: used to store literal string that appears at beginning of class, methods, modules... that serves as definition
+
+***globals(): a dict that stores all globally accessible stuff in current file. Used for introspection. Helpful when need to define classes implicitly
+such as the below code in Edward's models.random_variables:
+
+_globals = globals()
+for _name in sorted(dir(_distributions)):
+  _candidate = getattr(_distributions, _name)
+  if (_inspect.isclass(_candidate) and
+          _candidate != _distributions.Distribution and
+          issubclass(_candidate, _distributions.Distribution)):
+
+    _params = {'__doc__': _candidate.__doc__}
+    _globals[_name] = type(_name, (_RandomVariable, _candidate), _params)
+
+    del _candidate
+
+***Also from the code is type(name, (bases), dict): very useful when creating implicit classes
+name: name of class
+(bases): superclasses
+dict: methods, variables inside this class
+
+***underscore:
+_name: weak internal use indicator, will be ignored from import
+name_:avoid conflict with builtin e.g list_
+__name: name mangling e.g __name => _class__name: avoid name conflict between hierachical classes
+__name__: special methods e.g __init__
+
+7/1/2017
+***word2vec:
+skip-gram: given 1 word wo, predict N nearby words wi, e.g find N wi with highest posterior probability p(wi|wo)
+N nearby words are in wo's window: with predetermined window size c, 2c nearby/context words are w(o-c) ... w(o+c)
+cbow: given N context words, predict 1 word with highest prob p(wo|wi for i in N)
+both use the assumption bag-of-words: the order of context words does not matter
+skip-gram however, make up for order by sampling less frequently from distant words in the same window, so that closer context words are more
+representative of wo
+
+example architecture (reference: https://arxiv.org/pdf/1301.3781.pdf)
+cbow: 4 words before, 4 words after
+skip-gram: C=10
+the more data, the larger vector size
+3 training epoch, SGD, rate=0.025 adaptive
+300 dimensions ~ 783M words
+better: 1 epoch, 600 dimensions, 783M words
+    negative sampling > hierachical softmax, but with different ojbective
+
+***noise-contrastive estimation and negative sampling
+
+7/2/2017
+readings:
+***A neural probabilistic language model (http://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf)
+want to continue the tradition of n-gram
+By associating each word with a feature vector: smoother space, reduce #dimensions (as in against one-hot-encoding), expose semantic and syntactic similarities of word
+Learn simultaneously the word feature vectors and the parameters of conditional probability function of a word given sequence of previous words
+
+f(i, w(t-1), w(t-2), ..., w(t-n+1)) = g(i, C(w(t-1)), C(w(t-2)), ... )
+where f is the conditional prob dist of the sequence, g is the neural net function
+maximize L = 1/T * Sigma(log f(w(t), w(t-1), .., w(t-n+1); theta)) + Regularization
+or maximize the averaged (penalized) log likelihood
+very similar to cbow, in that model trains both feature extraction and probability distribution of sequence
+
+data parallel processing, parameter-parallel processing (very important in practice, but left for later for now)
+
+***negative sampling revisited (http://proceedings.mlr.press/v9/gutmann10a/gutmann10a.pdf)
+
+***sampled softmax loss
+
+belongs to a group of methods to estimate normalization constant(e.g contrastive divergence, score matching)
+
+***zip: intuitively, aggregate a list of iterables, and return an iterator which produces a tuple of elements from each of the iterables
+        use case: a = (1,2,3), b = (d,e,f), c = (x,y,z), iterator = zip(a,b,c), next(iterator) => (1,d,x), next(iterator) => (2,e,y)
+
+
+7/3/2017
+***cbow+skipgram revisited
+implemented cbow
+nce_loss in tensorflow
+**github jekyll
+
+7/4/2017 wasted
+7/5/2017 wasted
+7/6/2017
+readings:
+worked on bayesian statistics, conjugacy, linear regression, logistic regression (chapter 3,7,8 Murphy)
+***understood the difference between generative and discriminative models
+generative: p(x,y) ~ p(x|y, params) * p(y). Most computation is class-conditional density p(x|y). Can generate probable inputs because p (x,y) ~ p(x|y)
+discriminative: compute p(y|x, params) directly
+
+***linear regression: p(y|x, params) = Normal(y|w*x, var)
+   logistic regression = p(y|x, params) = Ber(sigm(w*x))
+
+7/7/2017
+generative model? NO
+wgan? NO
+readings:
+***last crack at NCE. finally understood the stated connection. Still dont know how to practically implement or sample
+
+7/8/2017
+readings:
+***Blei's variational inference (in notebook)
+understood the difficulty of evaluating evidence
+understood mean-field, ELBO and how to derive updates for latent variables
+? why can we drop constants when evaluating update?
+
+7/9/2017
+variational autoencoder
