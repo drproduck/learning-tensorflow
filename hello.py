@@ -2,52 +2,89 @@
 from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 import numpy as np
-x_data = np.random.uniform(1,10,1000)
-y_data = x_data ** 3
 
-x = tf.placeholder(tf.float32, [None, 784], 'input')
 
-y = tf.placeholder(tf.float32, [None, 10], 'label')
+def layer(x, weight_shape, bias_shape, scope_name):
+    w_stddev = (2.0/weight_shape.shape[0]) ** 0.5
+    w_init = tf.random_normal_initializer(stddev=w_stddev)
+    b_init = tf.constant_initializer(value=0)
+    stat_init= tf.random_normal_initializer()
 
-w1 = tf.Variable(tf.random_normal([784, 256], stddev=(2.0/(784*256))**0.5))
+    w = tf.get_variable('w',
+                        shape=weight_shape,
+                        initializer=w_init)
+    b = tf.get_variable('b',
+                        shape=bias_shape,
+                        initializer=b_init)
+    mean = tf.get_variable('mean',
+                           shape=x.get_shape,
+                           initializer=stat_init)
+    variance = tf.get_variable('variance',
+                               shape=x.get_shape,
+                               initializer=stat_init)
 
-b1 = tf.Variable(tf.constant(0, shape=[256]))
+    return tf.nn.relu(tf.nn.batch_normalization(tf.matmul(x, w) + b, mean=mean, variance=variance, offset=True, scale=True, variance_epsilon=1e-12))
 
-w2 = tf.Variable(tf.random_normal([256, 10], stddev=(2.0/(256*10))**0.5))
+def loss(output, y):
+    # xentropy = tf.nn.softmax_cross_entropy_with_logits(logits=output, labels=y)
+    # loss = tf.reduce_mean(xentropy)
+    loss = tf.reduce_mean(tf.square(tf.abs(output - y)))
+    return loss
 
-b2 = tf.Variable(tf.constant(0, [10]))
+def training(cost, global_step, learning_rate):
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    train_op = optimizer.minimize(cost, global_step=global_step)
+    return train_op
 
-keep_prob = tf.placeholder(tf.float32)
-
-output = tf.nn.relu(tf.matmul(tf.nn.dropout(tf.nn.relu(tf.matmul(x, w1) + b1), keep_prob=keep_prob), w2) + b2)
-
-loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=output, labels=y))
-
-sess = tf.Session()
-
-global_step = tf.Variable(0, name='global_step', trainable=False)
-
-sess.run(tf.initialize_all_variables)
-
-num_epoch = 100
-learn_rate = 0.01
-batch_size = 128
-num_batch = int(mnist.train.num_examples/128)
-
-train_op = tf.train.AdamOptimizer(learning_rate=learn_rate).minimize(loss, global_step=global_step)
-
-for epoch in range(num_epoch):
-    average_cost = 0
-    for i in range(num_batch):
-        images, labels = mnist.train.next_batch(batch_size)
-        minibatch_cost, _ = sess.run((loss, train_op), feed_dict={x: images, y: images, keep_prob: 0.5})
-        average_cost += minibatch_cost/num_batch
-
-    print('epoch ', epoch)
-    print('average cost', average_cost)
-
-    validation_loss = sess.run(loss, feed_dict={x: mnist.validation.images, y: mnist.validation.images})
-
-    correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(y, 1))
+def evaluate(output_test, y_test):
+    correct_prediction = tf.equal(tf.argmax(output_test, 1), tf.argmax(y_test, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    tf.summary.scalar('validation error', 1 - accuracy)
+    return accuracy
+
+def main():
+    x_data = np.random.uniform(1,10,1000).reshape(1000)[:,None]
+    print(x_data[0:10,0])
+    y_data = x_data ** 3
+    x_test = np.random.uniform(10,15,20).reshape(20)[:,None]
+    y_test = x_test ** 3
+    g = tf.Graph()
+    with g.as_default():
+        x = tf.placeholder(tf.float64, shape=[None, 1])
+        y = tf.placeholder(tf.float64, shape=[None, 1])
+        w1 = tf.Variable(tf.random_normal(shape=[1,128], stddev=0.5, dtype=tf.float64), dtype=tf.float64)
+        b1 = tf.Variable(tf.random_normal(shape=[128], dtype=tf.float64), dtype=tf.float64)
+        w2 = tf.Variable(tf.random_normal(shape=[128,1], dtype=tf.float64), dtype=tf.float64)
+        b2 = tf.Variable(tf.random_normal(shape=[1], dtype=tf.float64), dtype=tf.float64)
+        output = tf.nn.relu(tf.matmul(tf.nn.relu(tf.matmul(x, w1) + b1), w2) + b2)
+        cost = loss(output, y)
+        global_step = tf.Variable(0, name='step', trainable=False)
+        learning_rate = tf.placeholder(dtype=tf.float32)
+        train_op = training(cost, global_step=global_step, learning_rate=learning_rate)
+        eval_op = evaluate(output, y)
+
+        sess = tf.Session()
+        sess.run(tf.initialize_all_variables())
+
+        num_epoch = 5000
+        learn_rate = 0.1
+
+        for epoch in range(num_epoch):
+            average_cost = 0
+            cost_value, _ = sess.run((cost, train_op), feed_dict={x: x_data, y: y_data, learning_rate: learn_rate})
+
+            print('epoch ', epoch)
+            print('cost', cost_value)
+
+        output_value = sess.run(output, feed_dict={x: x_test})
+        # print(np.concatenate((x_test[1:100], output_value[1:100], y_test[1:100]), axis=1))
+        # print('test accuracy = ',accuracy)
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.subplot(211)
+        plt.plot(np.arange(0,20), y_test)
+        plt.subplot(212)
+        plt.plot(np.arange(0,20), output_value)
+        plt.show()
+
+if __name__ == '__main__':
+    main()
