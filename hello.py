@@ -5,26 +5,33 @@ import numpy as np
 
 
 def layer(x, weight_shape, bias_shape, scope_name):
-    w_stddev = (2.0/weight_shape.shape[0]) ** 0.5
+    w_stddev = (2.0/weight_shape[0]) ** 0.5
     w_init = tf.random_normal_initializer(stddev=w_stddev)
     b_init = tf.constant_initializer(value=0)
     stat_init= tf.random_normal_initializer()
+    with tf.variable_scope(scope_name):
 
-    w = tf.get_variable('w',
-                        shape=weight_shape,
-                        initializer=w_init)
-    b = tf.get_variable('b',
-                        shape=bias_shape,
-                        initializer=b_init)
-    mean = tf.get_variable('mean',
-                           shape=x.get_shape,
-                           initializer=stat_init)
-    variance = tf.get_variable('variance',
-                               shape=x.get_shape,
-                               initializer=stat_init)
+        w = tf.get_variable('w',
+                            shape=weight_shape,
+                            initializer=w_init,
+                            dtype=tf.float64)
+        b = tf.get_variable('b',
+                            shape=bias_shape,
+                            initializer=b_init,
+                            dtype=tf.float64)
+        mean = tf.get_variable('mean',
+                               shape=[x.get_shape()[1]],
+                               initializer=stat_init,
+                               dtype=tf.float64,
+                               validate_shape=False)
+        variance = tf.get_variable('variance',
+                                   shape=[x.get_shape()[1]],
+                                   initializer=stat_init,
+                                   dtype=tf.float64,
+                                   validate_shape=False)
 
-    return tf.nn.relu(tf.nn.batch_normalization(tf.matmul(x, w) + b, mean=mean, variance=variance, offset=True, scale=True, variance_epsilon=1e-12))
-
+    # return tf.nn.relu(tf.nn.batch_normalization(tf.matmul(x, w) + b, mean=mean, variance=variance, offset=True, scale=True, variance_epsilon=1e-12))
+    return tf.nn.relu(tf.matmul(x, w) + b)
 def loss(output, y):
     # xentropy = tf.nn.softmax_cross_entropy_with_logits(logits=output, labels=y)
     # loss = tf.reduce_mean(xentropy)
@@ -51,11 +58,13 @@ def main():
     with g.as_default():
         x = tf.placeholder(tf.float64, shape=[None, 1])
         y = tf.placeholder(tf.float64, shape=[None, 1])
-        w1 = tf.Variable(tf.random_normal(shape=[1,128], stddev=0.5, dtype=tf.float64), dtype=tf.float64)
-        b1 = tf.Variable(tf.random_normal(shape=[128], dtype=tf.float64), dtype=tf.float64)
-        w2 = tf.Variable(tf.random_normal(shape=[128,1], dtype=tf.float64), dtype=tf.float64)
-        b2 = tf.Variable(tf.random_normal(shape=[1], dtype=tf.float64), dtype=tf.float64)
-        output = tf.nn.relu(tf.matmul(tf.nn.relu(tf.matmul(x, w1) + b1), w2) + b2)
+        # w1 = tf.Variable(tf.random_normal(shape=[1,128], stddev=0.5, dtype=tf.float64))
+        # b1 = tf.Variable(tf.random_normal(shape=[128], dtype=tf.float64))
+        # w2 = tf.Variable(tf.random_normal(shape=[128,1], dtype=tf.float64))
+        # b2 = tf.Variable(tf.random_normal(shape=[1], dtype=tf.float64))
+        # output = tf.nn.relu(tf.matmul(tf.nn.relu(tf.matmul(x, w1) + b1), w2) + b2)
+        layer_activation = layer(x, [1,128], [128], 'layer1')
+        output = layer(layer_activation, [128,1], [1], 'layer2')
         cost = loss(output, y)
         global_step = tf.Variable(0, name='step', trainable=False)
         learning_rate = tf.placeholder(dtype=tf.float32)
@@ -65,7 +74,7 @@ def main():
         sess = tf.Session()
         sess.run(tf.initialize_all_variables())
 
-        num_epoch = 5000
+        num_epoch = 1000
         learn_rate = 0.1
 
         for epoch in range(num_epoch):
